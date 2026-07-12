@@ -10,6 +10,7 @@ A birdwatching iOS app built with SwiftUI and Firebase. Log bird sightings at yo
 - **Map view** — See all sightings plotted on an interactive map
 - **Filters** — Filter by species, distance from your current location, or show only your own sightings
 - **Profile** — View and edit your display name and photo
+- **Animated splash screen** — Custom SwiftUI launch animation with birds in flight, a rising sun, and an animated gradient sky
 
 ### Supported species
 
@@ -76,3 +77,18 @@ Birdie/
     ├── Misc/                # Root view, splash, empty state, user image
     └── Profile/             # Profile and edit profile views
 ```
+
+## Architecture
+
+Birdie follows a protocol-driven MVC-style architecture with dependency injection:
+
+- **Contracts** — every service and repository is defined as a protocol (`AuthServiceProtocol`, `SpotRepositoryProtocol`, `LocationServiceProtocol`, …). Controllers depend on these abstractions, never on concrete implementations.
+- **Controllers** — observable business-logic objects (`AuthController`, `BirdSpotController`, `LocationController`, `UserController`) that views talk to. All async work uses Swift Concurrency (`async`/`await`).
+- **Services** — concrete implementations backed by Firebase (Auth, Firestore, Storage) and Core Location, wired up in `BirdieApp.swift` and injected into the controllers.
+- **Views** — SwiftUI views grouped by feature, kept free of business logic.
+
+Because Firebase and location access sit behind protocols, they can be swapped for mocks in tests or replaced with a different backend without touching the controllers or views.
+
+## License
+
+This project is licensed under the MIT License — see [LICENSE](LICENSE) for details.
