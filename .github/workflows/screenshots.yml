@@ -1,0 +1,84 @@
+name: Screenshots
+
+# Builds the app, runs it in demo mode (in-memory data, no Firebase) on a simulator
+# and uploads screenshots of the main screens as an artifact.
+on:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: screenshots-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      SPM_DIR: ${{ github.workspace }}/../spm
+      BUNDLE_ID: dk.eaaa.dmu.maintz.Birdie
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Cache Swift packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.SPM_DIR }}
+          key: spm-${{ runner.os }}-${{ hashFiles('Birdie.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+
+      - name: Pick and boot simulator
+        id: sim
+        run: |
+          udid=$(bash .github/scripts/pick-simulator.sh)
+          test -n "$udid" || { xcrun simctl list devices available; exit 1; }
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+          xcrun simctl boot "$udid" || true
+          xcrun simctl bootstatus "$udid" -b
+
+      - name: Build app
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Birdie.xcodeproj \
+            -scheme Birdie \
+            -configuration Debug \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -derivedDataPath build/DerivedData \
+            -clonedSourcePackagesDirPath "$SPM_DIR" \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee xcodebuild.log | xcbeautify --renderer github-actions
+
+      - name: Capture screenshots
+        env:
+          UDID: ${{ steps.sim.outputs.udid }}
+        run: |
+          set -euo pipefail
+          mkdir -p screenshots
+          xcrun simctl status_bar "$UDID" override --time 9:41 --batteryState charged --batteryLevel 100 --cellularBars 4 --wifiBars 3
+          xcrun simctl install "$UDID" build/DerivedData/Build/Products/Debug-iphonesimulator/Birdie.app
+          xcrun simctl privacy "$UDID" grant location "$BUNDLE_ID" || true
+          xcrun simctl location "$UDID" set 55.6761,12.5683 || true
+          for tab in home list map profile; do
+            xcrun simctl terminate "$UDID" "$BUNDLE_ID" 2>/dev/null || true
+            xcrun simctl launch "$UDID" "$BUNDLE_ID" --demo --skip-splash --tab "$tab"
+            sleep 15
+            xcrun simctl io "$UDID" screenshot "screenshots/$tab.png"
+          done
+          ls -la screenshots
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: screenshots
+          path: |
+            screenshots/
+            xcodebuild.log
+          if-no-files-found: ignore
+          retention-days: 14

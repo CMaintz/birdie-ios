@@ -1,0 +1,84 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    name: Build and test (iOS simulator)
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      SPM_DIR: ${{ github.workspace }}/../spm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate project file
+        run: |
+          plutil -lint Birdie.xcodeproj/project.pbxproj
+          xcodebuild -version
+          xcodebuild -list -project Birdie.xcodeproj
+
+      - name: Cache Swift packages
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ env.SPM_DIR }}
+          key: spm-${{ runner.os }}-${{ hashFiles('Birdie.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+
+      - name: Pick simulator
+        id: sim
+        run: |
+          udid=$(bash .github/scripts/pick-simulator.sh)
+          test -n "$udid" || { xcrun simctl list devices available; exit 1; }
+          echo "udid=$udid" >> "$GITHUB_OUTPUT"
+
+      # No GoogleService-Info.plist is needed: under XCTest the app wires in-memory services.
+      - name: Build and run unit tests
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project Birdie.xcodeproj \
+            -scheme Birdie \
+            -destination "id=${{ steps.sim.outputs.udid }}" \
+            -clonedSourcePackagesDirPath "$SPM_DIR" \
+            -resultBundlePath TestResults.xcresult \
+            -skipPackagePluginValidation \
+            -skipMacroValidation \
+            CODE_SIGNING_ALLOWED=NO \
+            | tee xcodebuild.log | xcbeautify --renderer github-actions
+
+      - name: Test and coverage summary
+        if: success()
+        continue-on-error: true
+        run: |
+          {
+            echo "### Tests"
+            xcrun xcresulttool get test-results summary --path TestResults.xcresult --compact \
+              | jq -r '"\(.passedTests) passed, \(.failedTests) failed, \(.skippedTests) skipped (total \(.totalTestCount))"'
+            echo
+            echo "### Coverage (Birdie.app)"
+            echo '```'
+            xcrun xccov view --report --only-targets TestResults.xcresult
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload logs and results
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: test-results
+          path: |
+            xcodebuild.log
+            TestResults.xcresult
+          if-no-files-found: ignore
+          retention-days: 7
