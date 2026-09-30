@@ -105,7 +105,7 @@ struct SpotMapView: View {
 
     private func centerOnUser() {
         guard let location = locationController.currentLocation else { return }
-        position = .camera(MapCamera(centerCoordinate: location.coordinate, distance: 1500))
+        position = .camera(MapCamera(centerCoordinate: location.coordinate, distance: 3000))
         hasCenteredOnUser = true
     }
 }
