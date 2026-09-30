@@ -12,14 +12,30 @@
 		7FF166882DD1D3B800AAE791 /* AlertToast in Frameworks */ = {isa = PBXBuildFile; productRef = 7FF166872DD1D3B800AAE791 /* AlertToast */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		7FF166A52DD1D06700AAE791 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7FF166662DD1D06700AAE791 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 7FF1666D2DD1D06700AAE791;
+			remoteInfo = Birdie;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
 		7FF1666E2DD1D06700AAE791 /* Birdie.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Birdie.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		7FF166A02DD1D06700AAE791 /* BirdieTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BirdieTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		7FF166702DD1D06700AAE791 /* Birdie */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Birdie;
+			sourceTree = "<group>";
+		};
+		7FF166A12DD1D06700AAE791 /* BirdieTests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = BirdieTests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -35,6 +51,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7FF166A22DD1D06700AAE791 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -42,6 +65,7 @@
 			isa = PBXGroup;
 			children = (
 				7FF166702DD1D06700AAE791 /* Birdie */,
+				7FF166A12DD1D06700AAE791 /* BirdieTests */,
 				7FF1666F2DD1D06700AAE791 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -50,6 +74,7 @@
 			isa = PBXGroup;
 			children = (
 				7FF1666E2DD1D06700AAE791 /* Birdie.app */,
+				7FF166A02DD1D06700AAE791 /* BirdieTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -82,6 +107,29 @@
 			productReference = 7FF1666E2DD1D06700AAE791 /* Birdie.app */;
 			productType = "com.apple.product-type.application";
 		};
+		7FF166A72DD1D06700AAE791 /* BirdieTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 7FF166A82DD1D06700AAE791 /* Build configuration list for PBXNativeTarget "BirdieTests" */;
+			buildPhases = (
+				7FF166A42DD1D06700AAE791 /* Sources */,
+				7FF166A22DD1D06700AAE791 /* Frameworks */,
+				7FF166A32DD1D06700AAE791 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				7FF166A62DD1D06700AAE791 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				7FF166A12DD1D06700AAE791 /* BirdieTests */,
+			);
+			name = BirdieTests;
+			packageProductDependencies = (
+			);
+			productName = BirdieTests;
+			productReference = 7FF166A02DD1D06700AAE791 /* BirdieTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -94,6 +142,10 @@
 				TargetAttributes = {
 					7FF1666D2DD1D06700AAE791 = {
 						CreatedOnToolsVersion = 16.3;
+					};
+					7FF166A72DD1D06700AAE791 = {
+						CreatedOnToolsVersion = 16.3;
+						TestTargetID = 7FF1666D2DD1D06700AAE791;
 					};
 				};
 			};
@@ -116,12 +168,20 @@
 			projectRoot = "";
 			targets = (
 				7FF1666D2DD1D06700AAE791 /* Birdie */,
+				7FF166A72DD1D06700AAE791 /* BirdieTests */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
 		7FF1666C2DD1D06700AAE791 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		7FF166A32DD1D06700AAE791 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -138,7 +198,22 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		7FF166A42DD1D06700AAE791 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		7FF166A62DD1D06700AAE791 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 7FF1666D2DD1D06700AAE791 /* Birdie */;
+			targetProxy = 7FF166A52DD1D06700AAE791 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		7FF166772DD1D06800AAE791 /* Debug */ = {
@@ -269,7 +344,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Birdie uses your location to tag new sightings and show how far away other sightings are.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -297,7 +372,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
-				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "";
+				INFOPLIST_KEY_NSLocationWhenInUseUsageDescription = "Birdie uses your location to tag new sightings and show how far away other sightings are.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -313,6 +388,42 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		7FF166A92DD1D06700AAE791 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dk.eaaa.dmu.maintz.BirdieTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Birdie.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Birdie";
+			};
+			name = Debug;
+		};
+		7FF166AA2DD1D06700AAE791 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				GENERATE_INFOPLIST_FILE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.4;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = dk.eaaa.dmu.maintz.BirdieTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Birdie.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Birdie";
 			};
 			name = Release;
 		};
@@ -333,6 +444,15 @@
 			buildConfigurations = (
 				7FF1667A2DD1D06800AAE791 /* Debug */,
 				7FF1667B2DD1D06800AAE791 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		7FF166A82DD1D06700AAE791 /* Build configuration list for PBXNativeTarget "BirdieTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7FF166A92DD1D06700AAE791 /* Debug */,
+				7FF166AA2DD1D06700AAE791 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
