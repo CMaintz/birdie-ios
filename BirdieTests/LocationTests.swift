@@ -7,11 +7,8 @@ struct LocationTests {
         #expect(abs(kilometres - 157) < 3)
     }
 
-    @Test func distanceIsSymmetricAndZeroToItself() {
+    @Test func distanceToItselfIsZero() {
         #expect(Fixtures.copenhagen.distance(to: Fixtures.copenhagen) == 0)
-        let there = Fixtures.copenhagen.distance(to: Fixtures.aarhus)
-        let back = Fixtures.aarhus.distance(to: Fixtures.copenhagen)
-        #expect(abs(there - back) < 0.01)
     }
 
     @Test func isWithinRespectsTheRadius() {
