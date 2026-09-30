@@ -23,7 +23,6 @@ It's a birdwatching app in SwiftUI and Firebase: log a sighting at your current 
 - Filters: up to 10 species, maximum distance from you, or only your own sightings
 - Profile: change display name, email (Firebase sends a verification mail first) and password
 
-Species you can log (a fairly global selection, toucans included): Robin, Sparrow, Eagle, Bald Eagle, Hawk, Owl, Blackbird, Finch, Woodpecker, Duck, Swan, Pigeon, Parrot, Falcon, Pelican, Kingfisher, Heron, Toucan.
 
 ## Tech stack
 
@@ -36,19 +35,15 @@ Species you can log (a fairly global selection, toucans included): Robin, Sparro
 
 ## Architecture
 
+```mermaid
+flowchart TD
+    V[SwiftUI views] --> C[Observable controllers]
+    C --> P[Service protocols]
+    P -.-> F[Firebase services]
+    P -.-> M[In-memory services]
 ```
-Views (SwiftUI)
-  │  read state from, and call, @Observable controllers injected via .environment(...)
-  ▼
-Controllers              AuthController · UserController · BirdSpotController · LocationController
-  │  depend only on protocols
-  ▼
-Contracts                AuthServiceProtocol · SpotRepositoryProtocol
-  ▲
-  │  implemented by
-Services                 Firebase/   FirebaseAuthService, FirestoreSpotRepository
-                         InMemory/   InMemoryAuthService, InMemorySpotRepository, DemoData
-```
+
+Views only talk to the controllers, and the controllers only know the protocols in `Contracts/`.
 
 - `App/AppServices.swift` is the composition root. `AppMode.resolve()` picks the Firebase services for normal runs and the in-memory ones for `--demo`, unit tests and SwiftUI previews.
 - Business rules live outside the views so they can be unit tested: `SpotFilterData.apply` (species / "only mine" / distance filtering and newest-first ordering), `FormValidation` and `ProfileChanges` (form validation), plus the controllers themselves.
@@ -133,6 +128,7 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) builds the app and r
 
 ## Known limitations
 
+- Species come from a small hardcoded list. The plan is to pull them from a bird API instead, so you could log any species.
 - No Firestore security rules are included in the repo; configure them in your Firebase project.
 - Distance filtering happens on the device after fetching, so every matching sighting gets downloaded. Fine for a demo, less fine if it ever had real users.
 - Profile data (name, photo) lives on the Firebase Auth user rather than in Firestore.
