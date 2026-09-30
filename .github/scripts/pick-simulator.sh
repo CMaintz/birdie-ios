@@ -3,7 +3,7 @@
 set -euo pipefail
 xcrun simctl list devices available -j | jq -r '
   [.devices | to_entries[]
-    | select(.key | test("SimRuntime\.iOS-18"))
+    | select(.key | test("SimRuntime[.]iOS-18"))
     | .key as $runtime
     | .value[]
     | select(.name | test("^iPhone 16( Pro)?$"))
