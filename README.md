@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/CMaintz/birdie-ios/actions/workflows/ci.yml/badge.svg)](https://github.com/CMaintz/birdie-ios/actions/workflows/ci.yml)
 
-A birdwatching iOS app built with SwiftUI and Firebase. Log bird sightings at your current location, browse them in a list or on a map, and filter by species, distance, or your own entries.
+Birdie was my iOS exam project on the Datamatiker (AP Computer Science) programme at Erhvervsakademi Aarhus in May 2025. It got a 10 (of 12, on the Danish 7-point scale), and afterwards I went back and tidied it up (dependency injection, error handling, unit tests, CI), because exam code is exam code.
 
-Built as my iOS exam project on the Datamatiker (Computer Science AP) programme in May 2025, and tidied up afterwards (dependency injection, error handling, unit tests, CI).
+It's a birdwatching app in SwiftUI and Firebase: log a sighting at your current location, browse sightings in a list or on a map, and filter by species, distance or your own entries.
 
 <p align="center">
   <img src="docs/screenshots/home.png" width="250" alt="Home screen with sighting count">
@@ -16,14 +16,14 @@ Built as my iOS exam project on the Datamatiker (Computer Science AP) programme 
 
 ## Features
 
-- **Authentication**: register and log in with email and password (Firebase Auth)
-- **Log sightings**: pick a species, add an optional note, and the sighting is tagged with your GPS location
-- **Sightings list**: all sightings, newest first, with swipe-to-delete on your own entries and pull to refresh
-- **Map view**: sightings plotted on a MapKit map; tap a pin for details
-- **Filters**: up to 10 species, maximum distance from you, or only your own sightings
-- **Profile**: change display name, email (Firebase sends a verification mail first) and password
+- Authentication: register and log in with email and password (Firebase Auth)
+- Log sightings: pick a species, add an optional note, and the sighting is tagged with your GPS location
+- Sightings list: all sightings, newest first, with swipe-to-delete on your own entries and pull to refresh
+- Map view: sightings plotted on a MapKit map; tap a pin for details
+- Filters: up to 10 species, maximum distance from you, or only your own sightings
+- Profile: change display name, email (Firebase sends a verification mail first) and password
 
-Supported species: Robin, Sparrow, Eagle, Bald Eagle, Hawk, Owl, Blackbird, Finch, Woodpecker, Duck, Swan, Pigeon, Parrot, Falcon, Pelican, Kingfisher, Heron, Toucan.
+Species you can log (a fairly global selection, toucans included): Robin, Sparrow, Eagle, Bald Eagle, Hawk, Owl, Blackbird, Finch, Woodpecker, Duck, Swan, Pigeon, Parrot, Falcon, Pelican, Kingfisher, Heron, Toucan.
 
 ## Tech stack
 
@@ -77,25 +77,25 @@ BirdieTests/        Unit tests (Swift Testing)
 
 ## Setup
 
-1. **Clone the repo**
+1. Clone the repo
    ```bash
    git clone https://github.com/CMaintz/birdie-ios.git
    cd birdie-ios
    ```
 
-2. **Add your Firebase config**
+2. Add your Firebase config
    ```bash
    cp Birdie/GoogleService-Info.plist.example Birdie/GoogleService-Info.plist
    ```
    Replace the placeholder values with the ones from your app in the [Firebase console](https://console.firebase.google.com), or download the file from there directly. Sightings are stored in a `birdSpots` collection. Combining the species or "only mine" filters with date ordering needs composite indexes; Firestore logs a link that creates them the first time such a query runs.
 
-3. **(Optional) Add an OpenCage API key**
+3. (Optional) Add an OpenCage API key
    ```bash
    cp Birdie/Secrets.plist.example Birdie/Secrets.plist
    ```
    Only the debug-only global seeder (`SpotSeederService.createGlobalBirdSpots`) uses it, to check whether random coordinates are on land. The app itself runs without it.
 
-4. **Open and run**
+4. Open and run
    ```bash
    open Birdie.xcodeproj
    ```
@@ -134,7 +134,7 @@ CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) builds the app and r
 ## Known limitations
 
 - No Firestore security rules are included in the repo; configure them in your Firebase project.
-- Distance filtering happens on the device after fetching, so every matching sighting is downloaded; fine for a demo, not for a large dataset.
+- Distance filtering happens on the device after fetching, so every matching sighting gets downloaded. Fine for a demo, less fine if it ever had real users.
 - Profile data (name, photo) lives on the Firebase Auth user rather than in Firestore.
 
 ## License
