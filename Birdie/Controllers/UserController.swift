@@ -8,88 +8,39 @@
 import Foundation
 
 @Observable
-class UserController : UserControllerProtocol {
-    var currentUser: BirdieUser?
+final class UserController {
+    private(set) var currentUser: BirdieUser?
+
     private let authService: AuthServiceProtocol
 
-    init(authService: AuthServiceProtocol = AuthService()) {
+    init(authService: AuthServiceProtocol) {
         self.authService = authService
+        self.currentUser = authService.currentUser
     }
 
-    func loadCurrentUser() {
-        Task {
-            guard let user = await authService.getCurrentUser() else {
-                currentUser = nil
-                return
-            }
+    var userID: String? { currentUser?.id }
+    var displayName: String? { currentUser?.displayName }
+    var email: String? { currentUser?.email }
+    var photoURL: URL? { currentUser?.profileImageURL }
 
-            currentUser = BirdieUser(
-                id: user.uid,
-                email: user.email ?? "",
-                displayName: user.displayName ?? "Unnamed",
-                imageURL: user.photoURL?.absoluteString
-            )
-            print(user.photoURL?.relativeString ?? "Uh oh")
-            print(user.photoURL?.absoluteString ?? "Errrm")
+    /// Refreshes the profile from the backend, falling back to the cached user on failure.
+    func loadCurrentUser() async {
+        do {
+            currentUser = try await authService.reloadCurrentUser()
+        } catch {
+            Log.auth.error("Reloading user failed: \(error.localizedDescription, privacy: .public)")
+            currentUser = authService.currentUser
         }
     }
 
-
-    // MARK: - Update Methods
-
-    func updateDisplayName(_ name: String) async throws {
-        await authService.editProfile(
-            displayName: name,
-            photoURL: nil,
-            email: nil,
-            password: nil
-        )
-        loadCurrentUser()
-    }
-
-    func updatePhotoURL(_ urlString: String) async throws {
-        await authService.editProfile(
-            displayName: nil,
-            photoURL: urlString,
-            email: nil,
-            password: nil
-        )
-        loadCurrentUser()
-    }
-
-    func updateEmail(_ newEmail: String) async throws {
-        await authService.editProfile(
-            displayName: nil,
-            photoURL: nil,
-            email: newEmail,
-            password: nil
-        )
-        loadCurrentUser()
-    }
-
-    func updatePassword(_ newPassword: String) async throws {
-        await authService.editProfile(
-            displayName: nil,
-            photoURL: nil,
-            email: nil,
-            password: newPassword
-        )
-    }
-
-    //MARK: - Getters
-    func getDisplayName() -> String? {
-        currentUser?.displayName
-    }
-
-    func getUserID() -> String? {
-        return currentUser?.id
-    }
-
-    func getEmail() -> String? {
-        return currentUser?.email
-    }
-
-    func getPhotoURL() -> URL? {
-        return currentUser?.profileImageURL
+    func updateProfile(_ changes: ProfileChanges) async throws {
+        guard !changes.isEmpty else { return }
+        do {
+            try await authService.updateProfile(changes)
+        } catch {
+            Log.auth.error("Profile update failed: \(error.localizedDescription, privacy: .public)")
+            throw error
+        }
+        await loadCurrentUser()
     }
 }

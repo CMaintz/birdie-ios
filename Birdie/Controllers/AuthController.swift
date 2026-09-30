@@ -5,66 +5,73 @@
 //  Created by dmu mac 33 on 12/05/2025.
 //
 
-import FirebaseAuth
 import Foundation
 
 @Observable
-class AuthController {
-    private var currentFIRUser: User?
+final class AuthController {
+    private(set) var currentUser: BirdieUser?
 
-    var isAuthenticated: Bool = false
+    var isAuthenticated: Bool { currentUser != nil }
+    var currentUserID: String? { currentUser?.id }
 
-    var currentUserID: String {
-        if let userID = currentFIRUser?.uid {
-            print("UserID for this user!: \(userID)")
-            return userID
-        } else {
-            fatalError("No user logged in")
-        }
+    private let authService: AuthServiceProtocol
+
+    init(authService: AuthServiceProtocol) {
+        self.authService = authService
+        self.currentUser = authService.currentUser
     }
-
-    private var authHandle: AuthStateDidChangeListenerHandle?
 
     func listenToAuthState() {
-        authHandle = Auth.auth().addStateDidChangeListener { _, user in
-            Task { @MainActor in
-                self.currentFIRUser = user
-                self.isAuthenticated = (user != nil)
-            }
+        authService.observeAuthState { [weak self] user in
+            self?.currentUser = user
         }
     }
 
-    @MainActor
-    func signIn(with email: String, and password: String, ) async throws {
+    func signIn(email: String, password: String) async throws {
+        try FormValidation.validateLogin(email: email, password: password)
         do {
-            self.currentFIRUser = try await AuthService.signIn(email, password)
+            currentUser = try await authService.signIn(email: email.trimmed, password: password)
         } catch {
-            print("Error signing in: \(error.localizedDescription)")
+            Log.auth.error("Sign-in failed: \(error.localizedDescription, privacy: .public)")
+            throw error
         }
     }
 
+    /// Creates the account, then signs out again so the user logs in explicitly.
     func signUp(
-        as displayname: String,
-        with email: String,
-        and password: String
+        displayName: String,
+        email: String,
+        password: String,
+        confirmPassword: String
     ) async throws {
+        try FormValidation.validateRegistration(
+            displayName: displayName,
+            email: email,
+            password: password,
+            confirmPassword: confirmPassword
+        )
         do {
-            _ = try await AuthService.createUser(
-                nil,
-                displayname,
-                email,
-                password
+            _ = try await authService.createUser(
+                displayName: displayName.trimmed,
+                email: email.trimmed,
+                password: password,
+                photoURL: nil
             )
-            try AuthService.signOut()
+            try authService.signOut()
+            currentUser = nil
+        } catch {
+            Log.auth.error("Sign-up failed: \(error.localizedDescription, privacy: .public)")
+            throw error
         }
     }
 
-    func signOut() {
+    func signOut() throws {
         do {
-            try AuthService.signOut()
-        } catch let error {
-            print("Error signing out: \(error.localizedDescription)")
+            try authService.signOut()
+            currentUser = nil
+        } catch {
+            Log.auth.error("Sign-out failed: \(error.localizedDescription, privacy: .public)")
+            throw error
         }
     }
-
 }

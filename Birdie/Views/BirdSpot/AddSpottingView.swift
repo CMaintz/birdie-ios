@@ -20,12 +20,12 @@ struct AddSpottingView: View {
     @State var isSaving = false
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack {
                 Form {
                     Section(header: Text("Species")) {
                         Picker("Observed Species:", selection: $selectedSpecies) {
-                            Text("All Species").tag(BirdSpecies?.none)
+                            Text("Select species").tag(BirdSpecies?.none)
                             ForEach(BirdSpecies.allCases, id: \.self) { species in
                                 Text(species.rawValue.capitalized).tag(species)
                             }
@@ -78,33 +78,33 @@ struct AddSpottingView: View {
 
     private func saveSpotting() async {
         isSaving = true
+        defer { isSaving = false }
 
-        guard
-            let location = locationController.currentLocation,
-            let userID = userController.getUserID(),
-            let selectedSpecies
-        else {
-            toastManager.showToast(
-                AlertToast(type: .error(.red), title: "Error", subTitle: "Missing required data.")
+        do {
+            try await spotController.add(
+                species: selectedSpecies,
+                location: locationController.currentLocation,
+                note: note,
+                userID: userController.userID
             )
-            isSaving = false
+        } catch {
+            toastManager.showToast(
+                AlertToast(type: .error(.red), title: "Couldn't save", subTitle: error.localizedDescription)
+            )
             return
         }
 
-        await spotController.add(selectedSpecies, location, note, userID)
-        await spotController.updateSpots(currentLocation: locationController.currentLocation)
-
+        await spotController.loadSpots(
+            currentUserID: userController.userID,
+            near: locationController.currentLocation
+        )
         toastManager.showToast(
             AlertToast(type: .complete(.green), title: "Sighting Added")
         )
-
-        isSaving = false
         dismiss()
     }
 }
 
 #Preview {
-    AddSpottingView().environment(BirdSpotController()).environment(
-        UserController()
-    ).environment(LocationController()).environmentObject(ToastManager()).environment(UserController())
+    AddSpottingView().withDemoEnvironment()
 }

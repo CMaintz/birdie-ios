@@ -5,183 +5,121 @@
 //  Created by dmu mac 33 on 12/05/2025.
 //
 
+#if DEBUG
 import Foundation
 
+/// Debug-only: creates sample Firebase Auth users (from randomuser.me) with random sightings.
+/// Never runs unless explicitly requested, see `DebugSeeding`.
 struct UserSeederService {
-
     private static let seedingKey = "hasSeededUsers"
 
-    actor SeedCounter {
-        var successCount = 0
-        var failureCount = 0
+    let auth: AuthServiceProtocol
+    let spotSeeder: SpotSeederService
+    var userDefaults: UserDefaults = .standard
 
-        func incrementSuccess() {
-            successCount += 1
-        }
-
-        func incrementFailure() {
-            failureCount += 1
-        }
-    }
-
-    static func seedUsersIfNeeded() async {
-        // Check if we've already seeded users
-        let hasSeededUsers = UserDefaults.standard.bool(forKey: seedingKey)
-        if hasSeededUsers {
-            print("Users have already been seeded.")
+    func seedUsersIfNeeded() async {
+        guard !userDefaults.bool(forKey: Self.seedingKey) else {
+            Log.seeding.info("Users have already been seeded")
             return
         }
-
         do {
-            // Fetch 10 random users from randomuser.me <3 this API
             let randomUsers = try await fetchRandomUsers()
             try await seedUsers(from: randomUsers)
-
-            UserDefaults.standard.set(true, forKey: seedingKey)
-            print("Users have been seeded.")
+            userDefaults.set(true, forKey: Self.seedingKey)
         } catch {
-            print("Failed to seed users: \(error.localizedDescription)")
+            Log.seeding.error("Seeding users failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
-    static func resetSeedingFlag() {
-        UserDefaults.standard.set(false, forKey: seedingKey)
-        print(
-            "Reset seeding key to:",
-            UserDefaults.standard.bool(forKey: seedingKey)
-        )
+    func resetSeedingFlag() {
+        userDefaults.set(false, forKey: Self.seedingKey)
     }
 
-    // MARK: - Private Helper Functions
+    // MARK: - Private helpers
 
-    private static func fetchRandomUsers() async throws -> [RandomUser] {
+    private func fetchRandomUsers() async throws -> [RandomUser] {
         let url = URL(string: "https://randomuser.me/api/?results=10")!
 
-        // Create a custom URLSession with timeouts - Resilience ya'll
         let sessionConfig = URLSessionConfiguration.default
         sessionConfig.timeoutIntervalForRequest = 10
         sessionConfig.timeoutIntervalForResource = 15
         let session = URLSession(configuration: sessionConfig)
 
-        let request = URLRequest(url: url)
-
-        // Retry logic
-        var attempts = 0
-        let maxAttempts = 3
         var lastError: Error?
-
-        while attempts < maxAttempts {
+        for attempt in 1...3 {
             do {
-                let (data, response) = try await session.data(for: request)
-
-                // Add HTTP status code check
+                let (data, response) = try await session.data(from: url)
                 if let httpResponse = response as? HTTPURLResponse,
                     !(200...299).contains(httpResponse.statusCode)
                 {
                     throw URLError(.badServerResponse)
                 }
-
-                let decodedResponse = try JSONDecoder().decode(
-                    RandomUserResponse.self,
-                    from: data
-                )
-                return decodedResponse.results
+                return try JSONDecoder().decode(RandomUserResponse.self, from: data).results
             } catch {
-                attempts += 1
                 lastError = error
-
-                if attempts < maxAttempts {
-                    // Exponential backoff delay
-                    let delay = pow(2.0, Double(attempts))
-                    print("Retrying in \(Int(delay)) seconds...")
+                Log.seeding.notice("randomuser.me attempt \(attempt) failed")
+                if attempt < 3 {
+                    try? await Task.sleep(for: .seconds(pow(2.0, Double(attempt))))
                 }
             }
         }
-        // If retries exhausted, throw the last error encountered else we throw a fallback error for unexpected shenanigans
         throw lastError ?? URLError(.timedOut)
     }
 
-    static func seedUsers(from randomUsers: [RandomUser]) async throws {
-        let counter = SeedCounter()
-        let spotCollector = BirdSpotCollector()
+    /// Sequential on purpose: each `createUser` signs the new account in.
+    private func seedUsers(from randomUsers: [RandomUser]) async throws {
+        var allSpots: [BirdSpot] = []
         var errors: [Error] = []
 
-        await withThrowingTaskGroup(of: Void.self) { group in
-            for user in randomUsers {
-                group.addTask {
-                    do {
-                        var password = user.login.password
-                        if password.count < 6 {
-                            password += String(Int.random(in: 100...999))
-                        }
-
-                        let diceBearURL = "https://api.dicebear.com/6.x/avataaars/png?seed=\(user.login.uuid)"
-
-
-                        let createdUser = try await AuthService.createUser(
-                            diceBearURL,
-                            user.fullName,
-                            user.email,
-                            password
-                        )
-
-                        let userID = createdUser.uid
-                        let spots = await SpotSeederService.seedBirdSpots(
-                            for: userID
-                        )
-                        await spotCollector.append(spots)
-
-                        print(
-                            "Created user: \(user.email), password: \(password) UID: \(createdUser.uid)"
-                        )
-                        await counter.incrementSuccess()
-                        try AuthService.signOut()
-                    } catch {
-                        print(
-                            "Failed to create user: \(user.email), error: \(error.localizedDescription)"
-                        )
-                        await counter.incrementFailure()
-                        errors.append(error)
-                    }
+        for randomUser in randomUsers {
+            do {
+                var password = randomUser.login.password
+                if password.count < FormValidation.minimumPasswordLength {
+                    password += String(Int.random(in: 100...999))
                 }
+                let avatarURL = URL(
+                    string: "https://api.dicebear.com/6.x/avataaars/png?seed=\(randomUser.login.uuid)"
+                )
+                let createdUser = try await auth.createUser(
+                    displayName: randomUser.fullName,
+                    email: randomUser.email,
+                    password: password,
+                    photoURL: avatarURL
+                )
+                allSpots += spotSeeder.randomSpots(for: createdUser.id)
+                try auth.signOut()
+                Log.seeding.info("Created seed user \(createdUser.id, privacy: .private)")
+            } catch {
+                errors.append(error)
+                Log.seeding.error("Creating seed user failed: \(error.localizedDescription, privacy: .public)")
             }
         }
 
-        let allSpots = await spotCollector.getAll()
-
-        do {
-            try await FirestoreService.addSpotsBatch(allSpots)
-        } catch {
-            print("Batch failed: \(error.localizedDescription)")
-        }
-
-        let successCount = await counter.successCount
-        let failureCount = await counter.failureCount
-
-        print(
-            "Seeding completed: \(successCount) succeeded, \(failureCount) failed"
+        try await spotSeeder.repository.addSpots(allSpots)
+        Log.seeding.info(
+            "Seeding completed: \(randomUsers.count - errors.count) succeeded, \(errors.count) failed"
         )
 
-        if successCount == 0 && !randomUsers.isEmpty {
-            throw SeedingError.allUsersFailed(errors: errors)
+        if errors.count == randomUsers.count, let firstError = errors.first {
+            throw firstError
         }
     }
-
-    enum SeedingError: Error {
-        case allUsersFailed(errors: [Error])
-    }
-
-    actor BirdSpotCollector {
-        var spots: [BirdSpot] = []
-
-        func append(_ newSpots: [BirdSpot]) {
-            spots.append(contentsOf: newSpots)
-        }
-
-        func getAll() -> [BirdSpot] {
-            return spots
-        }
-    }
-
-
 }
+
+/// Opt-in switch for Firebase seeding: pass `--seed-firebase` as a launch argument
+/// or set `BIRDIE_SEED=1` in the scheme's environment. Debug builds only.
+enum DebugSeeding {
+    static let launchArgument = "--seed-firebase"
+
+    static var isRequested: Bool {
+        ProcessInfo.processInfo.arguments.contains(launchArgument)
+            || ProcessInfo.processInfo.environment["BIRDIE_SEED"] == "1"
+    }
+
+    static func runIfRequested(with services: AppServices) async {
+        guard isRequested, services.mode == .firebase else { return }
+        let spotSeeder = SpotSeederService(repository: services.spots)
+        await UserSeederService(auth: services.auth, spotSeeder: spotSeeder).seedUsersIfNeeded()
+    }
+}
+#endif

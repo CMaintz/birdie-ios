@@ -11,7 +11,6 @@ struct FilterView: View {
     @Environment(\.dismiss) private var dismiss
 
     let initialFilters: SpotFilterData
-    //Closure to pass filter data back on apply - Cause I know Kaptajn loves him some closures
     var onApply: (SpotFilterData) -> Void
 
     @State private var localFilters: SpotFilterData
@@ -26,7 +25,7 @@ struct FilterView: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section(header: Text("Distance Filter")) {
                     Toggle(
@@ -80,7 +79,6 @@ struct FilterView: View {
 }
 
 #Preview {
-    FilterView(initialFilters: SpotFilterData()) { _ in }.environmentObject(
-        ToastManager()
-    )
+    FilterView(initialFilters: SpotFilterData()) { _ in }
+        .withDemoEnvironment()
 }

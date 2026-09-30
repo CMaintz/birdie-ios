@@ -8,12 +8,14 @@
 import SwiftUI
 
 struct MainTabView: View {
-    @State private var selectedTab: Tabs = .home
+    @State private var selectedTab: Tabs = LaunchOptions.initialTab().flatMap(Tabs.init(rawValue:)) ?? .home
     @State private var showAddSpotting = false
     @State private var isButtonPressed = false
     @State private var animateFloating = false
 
-    enum Tabs {
+    @Environment(BirdSpotController.self) private var spotController
+
+    enum Tabs: String {
         case home, list, empty, map, profile
     }
 
@@ -82,6 +84,12 @@ struct MainTabView: View {
             }
 
 
+            .errorAlert(
+                Binding(
+                    get: { spotController.errorMessage },
+                    set: { spotController.errorMessage = $0 }
+                )
+            )
             .onChange(of: selectedTab) { oldValue, newValue in
                 if newValue == .empty {
                     selectedTab = oldValue
@@ -160,8 +168,5 @@ struct VisualEffectBlur: UIViewRepresentable {
 }
 
 #Preview {
-    MainTabView().environment(BirdSpotController()).environment(
-        UserController()
-    ).environment(LocationController()).environment(AuthController())
-        .environmentObject(ToastManager())
+    MainTabView().withDemoEnvironment()
 }

@@ -9,62 +9,43 @@ import AlertToast
 import SwiftUI
 
 struct RootView: View {
-    @State var birdSpotController: any BirdSpotControllerProtocol
-    @State var userController: any UserControllerProtocol
-    @State var locationController: any LocationServiceProtocol
-
-    @State var isRegistration: Bool = false
-    @State private var hasSplashed: Bool = false
-
     @Environment(AuthController.self) private var authController
+    @Environment(UserController.self) private var userController
     @EnvironmentObject var toastManager: ToastManager
 
-    init(
-        birdSpotController: any BirdSpotControllerProtocol = BirdSpotController(),
-        userController: any UserControllerProtocol = UserController(),
-        locationController: any LocationServiceProtocol = LocationController()
-    ) {
-        self.birdSpotController = birdSpotController
-        self.userController = userController
-        self.locationController = locationController
-    }
-    
+    @State private var isRegistration = false
+    @State private var hasSplashed = LaunchOptions.skipsSplash
+
     var body: some View {
-            ZStack {
-                if !authController.isAuthenticated {
-                    if isRegistration {
-                        RegistrationView(isSignUp: $isRegistration)
-                    } else {
-                        LoginView(isSignUp: $isRegistration)
-                    }
+        ZStack {
+            if !authController.isAuthenticated {
+                if isRegistration {
+                    RegistrationView(isSignUp: $isRegistration)
                 } else {
-                    if !hasSplashed {
-                       
-                        SplashView {
-                            Task { @MainActor in
-                                withAnimation {
-                                    hasSplashed = true
-                                }
-                            }
-                        }
-                    } else {
-                        MainTabView()
-                            .environment(birdSpotController)
-                            .environment(userController)
-                            .environment(locationController)
+                    LoginView(isSignUp: $isRegistration)
+                }
+            } else if !hasSplashed {
+                SplashView {
+                    withAnimation {
+                        hasSplashed = true
                     }
                 }
+            } else {
+                MainTabView()
             }
-            .toast(isPresenting: $toastManager.show) {
-                toastManager.alertToast
-            }
-            .onChange(of: authController.isAuthenticated) { _, newValue in
-                if newValue == true {
-                    userController.loadCurrentUser()
-                    hasSplashed = false
-                } else {
-                    hasSplashed = false
-                }
+        }
+        .toast(isPresenting: $toastManager.show) {
+            toastManager.alertToast
+        }
+        .onChange(of: authController.isAuthenticated) { _, isAuthenticated in
+            hasSplashed = LaunchOptions.skipsSplash
+            if isAuthenticated {
+                Task { await userController.loadCurrentUser() }
             }
         }
     }
+}
+
+#Preview {
+    RootView().withDemoEnvironment()
+}

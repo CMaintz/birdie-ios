@@ -8,9 +8,6 @@
 import AlertToast
 import SwiftUI
 
-import AlertToast
-import SwiftUI
-
 struct EditProfileView: View {
     @Environment(UserController.self) var userController
     @Environment(\.dismiss) var dismiss
@@ -22,7 +19,7 @@ struct EditProfileView: View {
     @State private var confirmPassword: String = ""
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             VStack(spacing: 20) {
                 Group {
                     CustomTextField("Display Name", text: $displayName)
@@ -55,8 +52,8 @@ struct EditProfileView: View {
             .padding()
             .navigationTitle("Edit Profile")
             .onAppear {
-                displayName = userController.getDisplayName() ?? ""
-                email = userController.getEmail() ?? ""
+                displayName = userController.displayName ?? ""
+                email = userController.email ?? ""
             }
         }
         .toast(isPresenting: $toastManager.show) {
@@ -65,59 +62,47 @@ struct EditProfileView: View {
     }
 
     private func updateProfile() async {
-        guard let currentDisplayname = userController.getDisplayName(),
-              let currentEmail = userController.getEmail() else {
+        guard let user = userController.currentUser else { return }
+
+        let changes: ProfileChanges
+        do {
+            changes = try ProfileChanges.diff(
+                from: user,
+                displayName: displayName,
+                email: email,
+                password: password,
+                confirmPassword: confirmPassword
+            )
+        } catch {
+            showError(error)
             return
         }
 
-        let trimmedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedPassword = password.trimmingCharacters(in: .whitespacesAndNewlines)
-
-        var updated = false
-        var errorMessages: [String] = []
-
-        if trimmedDisplayName != currentDisplayname, !trimmedDisplayName.isEmpty {
-            do {
-                try await userController.updateDisplayName(trimmedDisplayName)
-                updated = true
-            } catch {
-                errorMessages.append("Display name: \(error.localizedDescription)")
-            }
-        }
-
-        if trimmedEmail != currentEmail, !trimmedEmail.isEmpty {
-            do {
-                try await userController.updateEmail(trimmedEmail)
-                updated = true
-            } catch {
-                errorMessages.append("Email: \(error.localizedDescription)")
-            }
-        }
-
-        if !trimmedPassword.isEmpty {
-            do {
-                try await userController.updatePassword(trimmedPassword)
-                updated = true
-            } catch {
-                errorMessages.append("Password: \(error.localizedDescription)")
-            }
-        }
-
-        if updated {
-            toastManager.showToast(
-                AlertToast(type: .complete(.green), title: "Success!", subTitle: "Profile updated!")
-            )
-            dismiss()
-        } else if !errorMessages.isEmpty {
-            toastManager.showToast(
-                AlertToast(type: .error(.red), title: "Error!", subTitle: errorMessages.joined(separator: "\n"))
-            )
-        } else {
+        guard !changes.isEmpty else {
             toastManager.showToast(
                 AlertToast(type: .error(.red), title: "No Changes", subTitle: "No changes were made to your profile.")
             )
+            return
         }
+
+        do {
+            try await userController.updateProfile(changes)
+        } catch {
+            showError(error)
+            return
+        }
+
+        let subTitle = changes.email == nil
+            ? "Profile updated!"
+            : "Profile updated. Check your inbox to confirm the new email."
+        toastManager.showToast(AlertToast(type: .complete(.green), title: "Success!", subTitle: subTitle))
+        dismiss()
+    }
+
+    private func showError(_ error: Error) {
+        toastManager.showToast(
+            AlertToast(type: .error(.red), title: "Error!", subTitle: error.localizedDescription)
+        )
     }
 }
 
@@ -174,5 +159,5 @@ struct CustomSecureField: View {
 
 #Preview {
     EditProfileView()
-        .environmentObject(ToastManager()).environment(UserController())
+        .withDemoEnvironment()
 }

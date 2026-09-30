@@ -13,7 +13,6 @@ struct LoginView: View {
     @EnvironmentObject var toastManager: ToastManager
     @State private var email = ""
     @State private var password = ""
-    @State private var displayName = ""
     @Binding var isSignUp: Bool
 
     var body: some View {
@@ -66,19 +65,9 @@ struct LoginView: View {
     }
 
     private func handleAuth() {
-        guard !email.isEmpty, !password.isEmpty else {
-            toastManager.showToast(AlertToast(
-                displayMode: .banner(.slide),
-                type: .error(.red),
-                title: "Error",
-                subTitle: "Email and password required"
-            ))
-            return
-        }
-
         Task {
             do {
-                try await authController.signIn(with: email, and: password)
+                try await authController.signIn(email: email, password: password)
                 toastManager.showToast(AlertToast(
                     displayMode: .hud,
                     type: .complete(.green),
@@ -98,6 +87,5 @@ struct LoginView: View {
 
 #Preview {
     LoginView(isSignUp: .constant(false))
-        .environment(AuthController())
-        .environmentObject(ToastManager())
+        .withDemoEnvironment()
 }
