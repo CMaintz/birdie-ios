@@ -7,16 +7,14 @@
 
 import Foundation
 
-struct BirdieUser: Identifiable {
+struct BirdieUser: Identifiable, Equatable {
     let id: String
     let email: String
     let displayName: String
     let imageURL: String?
 
     var profileImageURL: URL? {
-        guard let unwrappedImageURL = imageURL, !unwrappedImageURL.isEmpty else { return nil }
-        return URL(string: unwrappedImageURL)
+        guard let imageURL, !imageURL.isEmpty else { return nil }
+        return URL(string: imageURL)
     }
-
-    
 }

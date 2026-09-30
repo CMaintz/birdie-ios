@@ -104,19 +104,14 @@ struct SpotInfoSection: View {
             }
             
             if let currentLocation = locationController.currentLocation {
-                 let distanceString = currentLocation.formattedDistance(
-                     to: spot.location
-                 )
                 HStack {
                     Image(systemName: "mappin.and.ellipse")
                         .foregroundColor(.red)
                     Text("Distance:")
                         .font(.headline)
-                    Text("\(distanceString) from you")
+                    Text("\(currentLocation.formattedDistance(to: spot.location)) from you")
                 }
-             }
-            
-          
+            }
 
             if let note = spot.note, !note.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
@@ -130,14 +125,15 @@ struct SpotInfoSection: View {
             }
         }
         .padding()
-        .background(Color.white)
+        .background(Color(.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
         .shadow(color: .black.opacity(0.05), radius: 6, x: 0, y: 2)
         .onAppear {
             locationController.startUpdatingLocation()
         }
         .onDisappear {
-            locationController.stopUpdatingLocation()   
+            locationController.stopUpdatingLocation()
+        }
     }
 }
 
@@ -151,5 +147,6 @@ struct SpotInfoSection: View {
                 "A toucan was spotted rolling around on the moon, mysterious and mildly annoyed, wearing a bowtie.",
             userID: "1awe2"
         )
-    ).environment(LocationController())
+    )
+    .withDemoEnvironment()
 }

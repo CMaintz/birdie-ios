@@ -5,55 +5,129 @@
 //  Created by dmu mac 33 on 13/05/2025.
 //
 
+#if DEBUG
 import Foundation
 
+/// Debug-only generator for random sightings. Nothing here runs unless called explicitly.
 struct SpotSeederService {
+    /// Firestore batches are limited to 500 writes.
+    private static let batchLimit = 499
 
-    static func seedBirdSpots(for userID: String) async -> [BirdSpot] {
-        let numberOfSpots = Int.random(in: 5...15)
-        var spots: [BirdSpot] = []
+    let repository: SpotRepositoryProtocol
 
-        for _ in 0..<numberOfSpots {
-            let birdSpot = generateRandomBirdSpot(for: userID)
-            spots.append(birdSpot)
+    /// 5-15 random sightings in and around Denmark from the last two weeks.
+    func randomSpots(for userID: String) -> [BirdSpot] {
+        (0..<Int.random(in: 5...15)).map { _ in
+            let species = BirdSpecies.allCases.randomElement()!
+            return BirdSpot(
+                species: species,
+                date: Self.randomDate(daysAgo: 0...14),
+                location: Location(
+                    latitude: Double.random(in: 48.1...58.1),
+                    longitude: Double.random(in: 8.0...15.2)
+                ),
+                note: Self.randomNote(for: species),
+                userID: userID
+            )
         }
-
-        return spots
     }
 
-    // MARK: - Helpers functions
+    /// Spreads older sightings for the given users across rough land boxes on each continent.
+    func createRegionalBirdSpots(for userIDs: [String]) async throws {
+        let landRegions: [(lat: ClosedRange<Double>, lon: ClosedRange<Double>)] = [
+            (24.0...49.0, -125.0 ... -66.0),  // North America
+            (-35.0 ... -10.0, 110.0...155.0),  // Australia
+            (35.0...70.0, -10.0...40.0),  // Europe
+            (-35.0...37.0, -70.0 ... -35.0),  // South America
+            (5.0...55.0, 70.0...140.0),  // Asia
+            (-35.0...35.0, -20.0...55.0),  // Africa
+        ]
+        guard !userIDs.isEmpty else { return }
 
-    // Helper function to generate random bird spot data for a user
-    private static func generateRandomBirdSpot(for userID: String) -> BirdSpot {
-        let species = BirdSpecies.allCases.randomElement()!
-        let location = generateRandomLocation()
-        let note = generateRandomNote(for: species)
-        let date = Calendar.current.date(
-            byAdding: .day,
-            value: -Int.random(in: 0...14),
-            to: Date()
-        )!
-
-        return BirdSpot(
-            species: species,
-            date: date,
-            location: location,
-            note: note,
-            userID: userID
-        )
+        var spots: [BirdSpot] = []
+        while spots.count < Self.batchLimit {
+            for userID in userIDs where spots.count < Self.batchLimit {
+                let region = landRegions.randomElement()!
+                let species = BirdSpecies.allCases.randomElement()!
+                spots.append(
+                    BirdSpot(
+                        species: species,
+                        date: Self.randomDate(daysAgo: 35...630),
+                        location: Location(
+                            latitude: Double.random(in: region.lat),
+                            longitude: Double.random(in: region.lon)
+                        ),
+                        note: Self.randomNote(for: species),
+                        userID: userID
+                    )
+                )
+            }
+        }
+        try await repository.addSpots(spots)
     }
 
-    // Helper function to generate random location data (approx. long and lat of DK + some.
-    private static func generateRandomLocation() -> Location {
-        let randomLatitude = Double.random(in: 48.1...58.1)
-        let randomLongitude = Double.random(in: 8.0...15.2)
-        return Location(latitude: randomLatitude, longitude: randomLongitude)
+    /// Like `createRegionalBirdSpots`, but samples the whole globe and asks the
+    /// OpenCage geocoder whether each point is on land. Needs `Secrets.plist`.
+    func createGlobalBirdSpots(for userIDs: [String]) async throws {
+        guard !userIDs.isEmpty else { return }
+
+        var spots: [BirdSpot] = []
+        var attempts = 0
+        while spots.count < Self.batchLimit, attempts < Self.batchLimit * 15 {
+            attempts += 1
+            let candidate = Location(
+                latitude: Double.random(in: -60.0...80.0),
+                longitude: Double.random(in: -180.0...180.0)
+            )
+            guard await Self.isLand(candidate) else { continue }
+
+            let species = BirdSpecies.allCases.randomElement()!
+            spots.append(
+                BirdSpot(
+                    species: species,
+                    date: Self.randomDate(daysAgo: 35...630),
+                    location: candidate,
+                    note: Self.randomNote(for: species),
+                    userID: userIDs[spots.count % userIDs.count]
+                )
+            )
+        }
+        try await repository.addSpots(spots)
     }
 
-    // Helper function to generate a random, semi-coherent, slightly alien-sounding note
-    private static func generateRandomNote(for species: BirdSpecies) -> String {
-        // Word banks for various parts of the sentence
-        //Inspired by caves of qud <3
+    // MARK: - Helpers
+
+    private static func randomDate(daysAgo range: ClosedRange<Int>) -> Date {
+        Calendar.current.date(byAdding: .day, value: -Int.random(in: range), to: Date())!
+    }
+
+    private static func isLand(_ location: Location) async -> Bool {
+        var components = URLComponents(string: "https://api.opencagedata.com/geocode/v1/json")!
+        components.queryItems = [
+            URLQueryItem(name: "q", value: "\(location.latitude),\(location.longitude)"),
+            URLQueryItem(name: "key", value: SecretKeys.openCageKey),
+            URLQueryItem(name: "no_annotations", value: "1"),
+        ]
+        guard let url = components.url else { return false }
+
+        do {
+            let (data, _) = try await URLSession.shared.data(from: url)
+            guard
+                let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                let results = json["results"] as? [[String: Any]]
+            else {
+                return false
+            }
+            // OpenCage only returns results for points it can place, which is mostly land.
+            return !results.isEmpty
+        } catch {
+            Log.seeding.error("Land check failed: \(error.localizedDescription, privacy: .public)")
+            return false
+        }
+    }
+
+    /// A random, semi-coherent, slightly alien-sounding note. Inspired by Caves of Qud.
+    static func randomNote(for species: BirdSpecies) -> String {
         let adjectives = [
             "mysterious", "sparkling", "confused", "wobbly", "fancy", "curious",
             "fluffy", "squeaky", "sneaky", "sleepy", "attractive", "bald",
@@ -76,7 +150,7 @@ struct SpotSeederService {
             "rocking a monocle", "having a cup of coffee", "wearing a scarf",
             "riding a bicycle",
         ]
-        let locations = [
+        let places = [
             "on top of a fence", "in the middle of a street", "under a tree",
             "on a park bench", "next to a vending machine",
             "in a busy shopping mall", "by the lake",
@@ -91,210 +165,11 @@ struct SpotSeederService {
         let spotSynonyms = [
             "spotted", "seen", "observed", "admired", "encountered", "watched",
             "perceived", "noticed", "sighted", "detected", "beheld",
-            "witnessed", "glanced", "glimpsed", "noted", "viewed",
+            "witnessed", "glimpsed", "noted", "viewed",
         ]
-        let idks = ["this", "a", "some"]
-        // Randomly select words from the lists
-        let adjective = adjectives.randomElement()!
-        let action = actions.randomElement()!
-        let accessory = accessories.randomElement()!
-        let location = locations.randomElement()!
-        let emotion = emotions.randomElement()!
-        let synonym = spotSynonyms.randomElement()!
-        let idk = idks.randomElement()!
+        let articles = ["this", "a", "some"]
 
-        let note =
-            "\(idk) \(species.rawValue) was \(synonym) \(action) \(location), \(adjective) and \(emotion), \(accessory)."
-
-        return note
+        return "\(articles.randomElement()!) \(species.rawValue) was \(spotSynonyms.randomElement()!) \(actions.randomElement()!) \(places.randomElement()!), \(adjectives.randomElement()!) and \(emotions.randomElement()!), \(accessories.randomElement()!)."
     }
-
-    // MARK: - separate function to create additional spots, just to improve seeding of firestore
-    
-    static func createRegionalBirdSpots(for uids: [String]) async {
-        let landRegions:
-            [(latRange: ClosedRange<Double>, lonRange: ClosedRange<Double>)] = [
-                (24.0...49.0, -125.0 ... -66.0),  // NA
-                (-35.0 ... -10.0, 110.0...155.0),  // Australia
-                (35.0...70.0, -10.0...40.0),  // Europe
-                (-35.0...37.0, -70.0 ... -35.0),  // SA
-                (5.0...55.0, 70.0...140.0),  // Asia
-                (-35.0...35.0, -20.0...55.0),  // Africa
-            ]
-        var spots: [BirdSpot] = []
-        var batchLimitReached = false
-
-        while !batchLimitReached {
-            for uid in uids {
-                for _ in 1...Int.random(in: 5...15) {
-                    if spots.count >= 499 {
-                        batchLimitReached = true
-                        break
-                    }
-
-                    let randomSpecies = BirdSpecies.allCases.randomElement()!
-                    let randomDate = Calendar.current.date(
-                        byAdding: .day,
-                        value: -Int.random(in: 35...630),
-                        to: Date()
-                    )!
-
-                    let region = landRegions.randomElement()!
-
-                    let lat = Double.random(in: region.latRange)
-                    let lon = Double.random(in: region.lonRange)
-                    let location = Location(latitude: lat, longitude: lon)
-
-                    let spot = BirdSpot(
-                        species: randomSpecies,
-                        date: randomDate,
-                        location: location,
-                        note: generateRandomNote(for: randomSpecies),
-                        userID: uid
-                    )
-                    spots.append(spot)
-                }
-            }
-        }
-        do {
-            try await FirestoreService.addSpotsBatch(spots)
-        } catch {
-            print("sample error!")
-        }
-        print("sample success!")
-    }
-
-    
-    
-    // MARK: - Ignore everything below this point, it's post-deadline!
-    
-    static func createSampleBirdSpots(uids: [String]) async {
-        let baseLocation = Location(latitude: 37.3349, longitude: -122.0090)
-        let baseCoordinate = baseLocation.coordinate
-        var spots: [BirdSpot] = []
-        
-            for uid in uids {
-                for _ in 1...Int.random(in: 5...15) {
-               
-
-                    let randomSpecies = BirdSpecies.allCases.randomElement()!
-                    let randomDate = Calendar.current.date(
-                        byAdding: .day,
-                        value: -Int.random(in: 35...630),
-                        to: Date()
-                    )!
-
-                    let latOffset = Double.random(in: -0.5757...3.6183)
-                    let lonOffset = Double.random(in: -0.7085...9.4615)
-                    let location = Location(
-                        latitude: baseCoordinate.latitude + latOffset,
-                        longitude: baseCoordinate.longitude + lonOffset
-                    )
-
-                    let spot = BirdSpot(
-                        species: randomSpecies,
-                        date: randomDate,
-                        location: location,
-                        note: generateRandomNote(for: randomSpecies),
-                        userID: uid
-                    )
-                    spots.append(spot)
-                }
-            }
-        do {
-            try await FirestoreService.addSpotsBatch(spots)
-        } catch {
-            print("sample error!")
-        }
-        print("sample success!")
-    }
-
-    
-    static func createGlobalBirdSpots(for uids: [String]) async {
-        var spots: [BirdSpot] = []
-        var batchLimitReached = false
-
-        while !batchLimitReached {
-            for uid in uids {
-                for _ in 1...Int.random(in: 5...15) {
-                    if spots.count >= 499 {
-                        batchLimitReached = true
-                        break
-                    }
-
-                    var validLocation: Location? = nil
-                    var attempts = 0
-
-                    while validLocation == nil && attempts < 15 {
-                        let randomLocation = Location(
-                            latitude: Double.random(in: -60.0...80.0),
-                            longitude: Double.random(in: -180.0...180.0)
-                        )
-
-                        let isOnLand = await isLand(randomLocation)
-                        if isOnLand {
-                            validLocation = randomLocation
-                        } else {
-                            attempts += 1
-                        }
-                    }
-
-                    let randomSpecies = BirdSpecies.allCases.randomElement()!
-                    let randomDate = Calendar.current.date(
-                        byAdding: .day,
-                        value: -Int.random(in: 35...630),
-                        to: Date()
-                    )!
-                    guard let location = validLocation else {
-                        continue
-                    }
-                    let spot = BirdSpot(
-                        species: randomSpecies,
-                        date: randomDate,
-                        location: location,
-                        note: generateRandomNote(for: randomSpecies),
-                        userID: uid
-                    )
-
-                    spots.append(spot)
-                }
-            }
-        }
-
-        do {
-            try await FirestoreService.addSpotsBatch(spots)
-        } catch {
-            print("Error seeding global spots: \(error)")
-        }
-
-        print("Global bird spots created!")
-    }
-
-    static func isLand(_ location: Location) async -> Bool {
-        let apiKey = SecretKeys.openCageKey
-        let urlString =
-            "https://api.opencagedata.com/geocode/v1/json?q=\(location.latitude),\(location.longitude)&key=\(apiKey)&no_annotations=1"
-
-        guard let url = URL(string: urlString) else { return false }
-
-        do {
-            let (data, _) = try await URLSession.shared.data(from: url)
-            guard
-                let json = try JSONSerialization.jsonObject(with: data)
-                    as? [String: Any],
-                let results = json["results"] as? [[String: Any]]
-            else {
-                return false
-            }
-
-            // If OpenCage returns results, it's land!..ish
-            return !results.isEmpty
-        } catch {
-            print("Failed land check: \(error.localizedDescription)")
-            return false
-        }
-    }
-
-
-
 }
+#endif

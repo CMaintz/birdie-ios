@@ -10,31 +10,24 @@ import SwiftUI
 
 struct SpotMapView: View {
     @Environment(BirdSpotController.self) var spotController
-    @Environment(AuthController.self) var authController
     @Environment(LocationController.self) var locationController
+    @Environment(UserController.self) var userController
 
     @State private var position: MapCameraPosition = .camera(
         MapCamera(
-            centerCoordinate: CLLocationCoordinate2D(
-                latitude: 56.0,
-                longitude: 10.0
-            ),
+            centerCoordinate: CLLocationCoordinate2D(latitude: 56.0, longitude: 10.0),
             distance: 30000
         )
     )
-    @State private var spots: [BirdSpot] = []
     @State private var showFilter = false
     @State private var selectedSpot: BirdSpot?
-    @State private var isLoading = true
+    @State private var hasCenteredOnUser = false
 
     var body: some View {
-        ZStack(alignment: .topTrailing) {
+        ZStack(alignment: .top) {
             Map(position: $position, bounds: .init(minimumDistance: 500)) {
-                ForEach(spotController.spots, id: \.id) { spot in
-                    Annotation(
-                        spot.species.rawValue,
-                        coordinate: spot.location.coordinate
-                    ) {
+                ForEach(spotController.spots) { spot in
+                    Annotation(spot.species.rawValue, coordinate: spot.location.coordinate) {
                         Button {
                             selectedSpot = spot
                         } label: {
@@ -51,86 +44,75 @@ struct SpotMapView: View {
                 MapUserLocationButton()
                 MapCompass()
             }
-            .onAppear {
-                if locationController.currentLocation != nil {
-                    updateMapPosition()
-                } else {
-                    Task {
-                        try? await Task.sleep(nanoseconds: 1_000_000_000)
-                        if locationController.currentLocation != nil {
-                            updateMapPosition()
-                        }
-                    }
-                }
-            }
 
-            .onChange(of: locationController.currentLocation) {
-                updateMapPosition()
-            }
-            .navigationTitle("Sightings Map")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        showFilter.toggle()
-                    } label: {
-                        Image(systemName: "slider.horizontal.3").resizable()
-                            .frame(width: 32, height: 20)
-                    }
-
-                }
-            }
-
-            .sheet(item: $selectedSpot) { spot in
-                SpotInfoSection(spot: spot)
-                    .presentationDetents([.fraction(0.25)])
-            }
-
-            .sheet(isPresented: $showFilter) {
-                FilterView(
-                    initialFilters: spotController.filters,
-                    onApply: { newFilters in
-                        Task {
-                            spotController.filters = newFilters
-                            await spotController.updateSpots(
-                                currentLocation: locationController
-                                    .currentLocation
-                            )
-                            showFilter = false
-                        }
-                    }
-                )
-                .presentationDetents([.fraction(0.65)])
-            }
-            if isLoading {
-                ProgressView("Loading location...")
-                    .progressViewStyle(CircularProgressViewStyle())
+            if let locationError = locationController.locationError {
+                Label(locationError, systemImage: "location.slash")
                     .padding()
                     .background(.thinMaterial)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding()
+            } else if !hasCenteredOnUser {
+                ProgressView("Loading location...")
+                    .padding()
+                    .background(.thinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .padding()
             }
-
         }
+        .navigationTitle("Sightings Map")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showFilter.toggle()
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .resizable()
+                        .frame(width: 32, height: 20)
+                }
+                .accessibilityLabel("Filter sightings")
+            }
+        }
+        .sheet(item: $selectedSpot) { spot in
+            SpotInfoSection(spot: spot)
+                .presentationDetents([.fraction(0.25)])
+        }
+        .sheet(isPresented: $showFilter) {
+            FilterView(initialFilters: spotController.filters) { newFilters in
+                spotController.filters = newFilters
+                Task { await reload() }
+            }
+            .presentationDetents([.fraction(0.65)])
+        }
+        .task { await reload() }
         .onAppear {
             locationController.startUpdatingLocation()
+            centerOnUser()
         }
         .onDisappear {
             locationController.stopUpdatingLocation()
         }
+        .onChange(of: locationController.currentLocation) {
+            centerOnUser()
+        }
     }
-    
 
-    private func updateMapPosition() {
-        guard let location = locationController.currentLocation else { return }
-        position = .camera(
-            MapCamera(centerCoordinate: location.coordinate, distance: 1000)
+    private func reload() async {
+        await spotController.loadSpots(
+            currentUserID: userController.userID,
+            near: locationController.currentLocation
         )
-        isLoading = false
+    }
+
+    private func centerOnUser() {
+        guard let location = locationController.currentLocation else { return }
+        position = .camera(MapCamera(centerCoordinate: location.coordinate, distance: 3000))
+        hasCenteredOnUser = true
     }
 }
 
 #Preview {
-    SpotMapView()
-        .environment(BirdSpotController())
-        .environment(AuthController())
-        .environment(LocationController())
+    NavigationStack {
+        SpotMapView()
+    }
+    .withDemoEnvironment()
 }

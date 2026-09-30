@@ -39,18 +39,18 @@ struct RegistrationView: View {
                 .padding()
                 .textContentType(.username)
 
-            SecureField("Confirm Password", text: $confirmPassword)
-                .textFieldStyle(RoundedBorderTextFieldStyle())
-                .padding()
-                .textContentType(.password)
-                .keyboardType(.default)
-                .textInputAutocapitalization(.never)
-
             SecureField("Password", text: $password)
                 .textFieldStyle(RoundedBorderTextFieldStyle())
                 .textContentType(.password)
                 .keyboardType(.default)
                 .padding()
+                .textInputAutocapitalization(.never)
+
+            SecureField("Confirm Password", text: $confirmPassword)
+                .textFieldStyle(RoundedBorderTextFieldStyle())
+                .padding()
+                .textContentType(.password)
+                .keyboardType(.default)
                 .textInputAutocapitalization(.never)
 
             Button(action: {
@@ -82,33 +82,14 @@ struct RegistrationView: View {
     }
 
     private func handleAuth() {
-        guard !email.isEmpty, !password.isEmpty, !displayName.isEmpty else {
-            toastManager.showToast(AlertToast(
-                displayMode: .banner(.slide),
-                type: .error(.red),
-                title: "Error",
-                subTitle: "Name, Email and password required"
-            ))
-            return
-        }
-
-        guard password == confirmPassword else {
-            toastManager.showToast(AlertToast(
-                displayMode: .banner(.slide),
-                type: .error(.red),
-                title: "Error",
-                subTitle: "Passwords do not match"
-            ))
-            return
-        }
-
         Task {
             do {
                 try await authController.signUp(
-                    as: displayName,
-                    with: email,
-                    and: password
-                ) //TODO: the darn thing should be timed to wait or some shizzle
+                    displayName: displayName,
+                    email: email,
+                    password: password,
+                    confirmPassword: confirmPassword
+                )
                 isSignUp = false
                 toastManager.showToast(AlertToast(
                     type: .complete(.green),
@@ -128,6 +109,5 @@ struct RegistrationView: View {
 
 #Preview {
     RegistrationView(isSignUp: .constant(true))
-        .environment(AuthController())
-        .environmentObject(ToastManager())
+        .withDemoEnvironment()
 }

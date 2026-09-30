@@ -5,6 +5,7 @@
 //  Created by dmu mac 33 on 13/05/2025.
 //
 
+import AlertToast
 import SwiftUI
 
 struct ProfileView: View {
@@ -12,13 +13,14 @@ struct ProfileView: View {
 
     @Environment(AuthController.self) var authController
     @Environment(UserController.self) var userController
+    @EnvironmentObject var toastManager: ToastManager
 
     var body: some View {
         VStack(spacing: 24) {
             Spacer()
             VStack(spacing: 12) {
                 UserImageView(
-                    imageURL: userController.getPhotoURL(),
+                    imageURL: userController.photoURL,
                     size: 160
                 )
                 .clipShape(Circle())
@@ -48,9 +50,7 @@ struct ProfileView: View {
                     EditProfileView()
                 }
 
-                Button(action: {
-                    authController.signOut()
-                }) {
+                Button(action: signOut) {
                     Label("Log Out", systemImage: "rectangle.portrait.and.arrow.right")
                         .frame(maxWidth: .infinity)
                         .padding()
@@ -66,8 +66,21 @@ struct ProfileView: View {
         .padding()
         .navigationTitle("Profile")
     }
+
+    private func signOut() {
+        do {
+            try authController.signOut()
+        } catch {
+            toastManager.showToast(
+                AlertToast(type: .error(.red), title: "Couldn't log out", subTitle: error.localizedDescription)
+            )
+        }
+    }
 }
 
 #Preview {
-    ProfileView().environment(AuthController()).environment(UserController())
+    NavigationStack {
+        ProfileView()
+    }
+    .withDemoEnvironment()
 }

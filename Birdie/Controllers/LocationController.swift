@@ -2,29 +2,38 @@ import CoreLocation
 import Foundation
 
 @Observable
-class LocationController: NSObject, LocationServiceProtocol {
-    
-    private var locationManager: CLLocationManager?
-    
-    var currentLocation: Location? = nil
-    var locationError: String? = nil
-    
-    override init() {
+final class LocationController: NSObject {
+    @ObservationIgnored private var locationManager: CLLocationManager?
+    private let fixedLocation: Location?
+
+    private(set) var currentLocation: Location?
+    private(set) var locationError: String?
+
+    /// Pass `fixedLocation` to bypass Core Location entirely (demo mode, previews, tests).
+    init(fixedLocation: Location? = nil) {
+        self.fixedLocation = fixedLocation
         super.init()
-        checkLocationServices()
+        if let fixedLocation {
+            currentLocation = fixedLocation
+        } else {
+            checkLocationServices()
+        }
     }
 
     func startUpdatingLocation() {
+        guard fixedLocation == nil else { return }
         locationManager?.startUpdatingLocation()
     }
-    
+
     func stopUpdatingLocation() {
+        guard fixedLocation == nil else { return }
         locationManager?.stopUpdatingLocation()
     }
+
     private func checkLocationServices() {
         DispatchQueue.global(qos: .userInitiated).async {
             let servicesEnabled = CLLocationManager.locationServicesEnabled()
-            
+
             DispatchQueue.main.async {
                 guard servicesEnabled else {
                     self.locationError = "Location services are disabled"
@@ -34,20 +43,20 @@ class LocationController: NSObject, LocationServiceProtocol {
             }
         }
     }
-    
+
     private func setupLocationManager() {
         let manager = CLLocationManager()
         manager.delegate = self
         manager.desiredAccuracy = kCLLocationAccuracyBest
-        self.locationManager = manager
-        
+        locationManager = manager
+
         if manager.authorizationStatus == .notDetermined {
             manager.requestWhenInUseAuthorization()
         } else {
             checkAuthorizationStatus(manager)
         }
     }
-    
+
     private func checkAuthorizationStatus(_ manager: CLLocationManager) {
         switch manager.authorizationStatus {
         case .notDetermined:
@@ -57,29 +66,28 @@ class LocationController: NSObject, LocationServiceProtocol {
         case .denied:
             locationError = "Location access denied"
         case .authorizedWhenInUse, .authorizedAlways:
-            // Don't automatically start - let the caller decide
-            //manager.startUpdatingLocation()
+            locationError = nil
         @unknown default:
             locationError = "Unknown authorization status"
         }
     }
 }
 
-// MARK: - LocManager delegate
+// MARK: - CLLocationManagerDelegate
 
 extension LocationController: CLLocationManagerDelegate {
-    
     func locationManagerDidChangeAuthorization(_ manager: CLLocationManager) {
         checkAuthorizationStatus(manager)
     }
-    
+
     func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
         guard let latest = locations.last else { return }
-        self.currentLocation = Location(from: latest.coordinate)
-        self.locationError = nil
+        currentLocation = Location(from: latest.coordinate)
+        locationError = nil
     }
-    
+
     func locationManager(_ manager: CLLocationManager, didFailWithError error: Error) {
-        self.locationError = error.localizedDescription
+        Log.location.error("Location update failed: \(error.localizedDescription, privacy: .public)")
+        locationError = error.localizedDescription
     }
 }

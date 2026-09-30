@@ -49,8 +49,15 @@ struct SpeciesPickerView: View {
         if selectedSpecies.contains(species) {
             selectedSpecies.remove(species)
         } else {
-            if selectedSpecies.count >= 10 {
-                toastManager.showToast(AlertToast(displayMode: .banner(.slide), type: .error(.red), title: "Limit Reached", subTitle: "You can only select up to 10 species."))
+            if selectedSpecies.count >= SpotFilterData.maxSelectableSpecies {
+                toastManager.showToast(
+                    AlertToast(
+                        displayMode: .banner(.slide),
+                        type: .error(.red),
+                        title: "Limit Reached",
+                        subTitle: "You can only select up to \(SpotFilterData.maxSelectableSpecies) species."
+                    )
+                )
                 return
             }
             selectedSpecies.insert(species)
